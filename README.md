@@ -1,3 +1,3 @@
 # ST558test
 
-I'm so excieted about learning to be a **data scientist**
+I'm so excited about learning to be a **data scientist**
