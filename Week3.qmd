@@ -1,0 +1,414 @@
+---
+title: "week 3"
+author: "Melanie Beebe"
+format: pdf
+editor: visual
+---
+
+# Reading Delimited Data
+
+```{r}
+library(tidyverse)
+#alt, use readr instead of tidyverse
+#can read csv from online link
+bike_details <- read_csv("https://www4.stat.ncsu.edu/~online/datasets/bikeDetails.csv")
+bike_details
+```
+
+tibbles do not coerce to a vector when you subset one column using \[\], need to instead call as dataframe or use \$
+
+```{r}
+as.data.frame(bike_details)[1:10 ,1]
+#OR
+bike_details$name[1:10]
+#better
+bike_details[1:10, ] |>
+  pull(name)
+```
+
+## another csv example
+
+```{r}
+library(readr)
+air_quality_data <- read_csv("https://www4.stat.ncsu.edu/~online/datasets/AirQuality.csv")
+air_quality_data
+```
+
+```{r}
+#not columns have '' because not standard
+air_quality_data$`CO(GT)`[1:10]
+```
+
+## reading in a fixed width field
+
+```{r}
+library(readr)
+#fixed width, columns lined up and only spaces used, no tabs
+#read_fwf("https://www4.stat.ncsu.edu/~online/datasets/cigarettes.txt")
+#Error: `file` must be a regular file, not a connection
+#error unexpected, some change in code
+#solution
+#look at original file and copy first lint to determine widths
+#Alpine           14.1 0.86     0.9853 13.6
+#1-17, 18-22, 23-31, 32-38, 39-42, 
+#widths are 17, 5, 8, 6, 3  paste in fwf_widths
+#first row is not data so want to skip the first row
+read_fwf("https://www4.stat.ncsu.edu/~online/datasets/cigarettes.txt",
+         fwf_widths(c(17, 5, 9, 7, 4), c("brand", "tar", "nicotine", "weight",
+                                         "co")), skip = 1)
+#use above step to check column types for data validation
+
+```
+
+## delimited raw data with character delimiter and no column names
+
+```{r}
+#in function read_delim default column names is TRUE so add names
+ump_data <- read_delim("https://www4.stat.ncsu.edu/~online/datasets/umps2012.txt", 
+                       delim = ">",
+                       col_names = c("Year", "Month", "Day", "Home", "Away", "HPUmpire")
+)
+ump_data
+```
+
+## data comments
+
+first 3 columns are stored as numeric (dbl) but correspond to a date, let's fix this
+
+```{r}
+library(lubridate)
+#create column to store date (ymd is year month day which is data format)
+ump_data$date <- ymd("2012-01-01")
+head(ump_data)
+```
+
+```{r}
+for (i in 1:nrow(ump_data)){
+  ump_data$date[i] <- ymd(paste(ump_data$Year[i], ump_data$Month[i], ump_data$Day[i], sep = "-"))
+}
+head(ump_data)
+```
+
+## Text files
+
+use read_file() or read_lines()
+
+# Reading Excel Data
+
+```{r}
+library(readxl)
+dry_bean_data <- read_excel("Dry_Bean_Dataset.xlsx")
+dry_bean_data
+```
+
+## Reading From a Particular Sheet
+
+```{r}
+#We can pull in data from a specific sheet with the name or via integers 
+#(or NULL for 1st)
+citation_dry_bean_data <- read_excel("Dry_Bean_Dataset.xlsx", 
+                            sheet = excel_sheets("Dry_Bean_Dataset.xlsx")[2])
+citation_dry_bean_data
+
+```
+
+Notice that didn’t read in correctly! There is only one entry there (the 1st cell, 1st column) and it is currently being treated as the column name. Similar to the read_csv() function we can use col_names = FALSE here (thanks coherent ecosystem!!).
+
+```{r}
+citation_dry_bean_data <- read_excel("Dry_Bean_Dataset.xlsx", 
+                            sheet = excel_sheets("Dry_Bean_Dataset.xlsx")[2],
+                            col_names = FALSE)
+citation_dry_bean_data
+cat(dplyr::pull(citation_dry_bean_data, 1))
+```
+
+## Reading Only Specific Cells
+
+```{r}
+dry_bean_range <- read_excel("Dry_Bean_Dataset.xlsx", 
+                   range = cell_cols("A:B")
+                   )
+dry_bean_range
+```
+
+# Manipulating with dplyr
+
+## Going back to air quality data
+
+```{r}
+air_quality_data
+```
+
+### manipulate to clean it up
+
+```{r}
+#view data (equivalent to looking in environment)
+View(air_quality_data)
+#notice columns 1 and the last two ... columns aren't useful
+air_quality_data |>
+  select(-starts_with("..."))
+```
+
+### create some new variables
+
+```{r}
+#need to first rename columns so they are standard
+air_quality_data |>
+  select(-starts_with("...")) |>
+  rename("co_gt" = 'CO(GT)', "pt_08_s1_co" = 'PT08.S1(CO)', 
+         "nmhc_gt" = 'NMHC(GT)', "c6h6_gt" = 'C6H6(GT)', 
+         "pt_08_s2_nmhc" = 'PT08.S2(NMHC)', "nox_gt" = 'NOx(GT)', 
+         "pt_08_s3_nox" = 'PT08.S3(NOx)', "no2_gt" = 'NO2(GT)', 
+         "pt_08_s4_no2" = 'PT08.S4(NO2)', "pt_08_s5_o3" = 'PT08.S5(O3)') |>
+  filter(co_gt != -200) |>
+  mutate(mean_co_gt = mean(co_gt, na.rm = TRUE)) |>
+  View()
+#he thinks the -200 are in co_gt are missing values, so added filter to remove
+  
+   
+```
+
+### add mean for all numeric columns
+
+```{r}
+#need to specify names if you don't want columns replaced, using {'col} in
+#documentation for across
+air_quality_data |>
+  select(-starts_with("...")) |>
+  rename("co_gt" = 'CO(GT)', "pt_08_s1_co" = 'PT08.S1(CO)', 
+         "nmhc_gt" = 'NMHC(GT)', "c6h6_gt" = 'C6H6(GT)', 
+         "pt_08_s2_nmhc" = 'PT08.S2(NMHC)', "nox_gt" = 'NOx(GT)', 
+         "pt_08_s3_nox" = 'PT08.S3(NOx)', "no2_gt" = 'NO2(GT)', 
+         "pt_08_s4_no2" = 'PT08.S4(NO2)', "pt_08_s5_o3" = 'PT08.S5(O3)') |>
+  filter(co_gt != -200) |>
+  mutate(across(where(is.numeric), mean, .names = "mean_{.col}")) |>
+  View()
+```
+
+```{r}
+#can also return multiple functions
+air_quality_data |>
+  select(-starts_with("...")) |>
+  rename("co_gt" = 'CO(GT)', "pt_08_s1_co" = 'PT08.S1(CO)', 
+         "nmhc_gt" = 'NMHC(GT)', "c6h6_gt" = 'C6H6(GT)', 
+         "pt_08_s2_nmhc" = 'PT08.S2(NMHC)', "nox_gt" = 'NOx(GT)', 
+         "pt_08_s3_nox" = 'PT08.S3(NOx)', "no2_gt" = 'NO2(GT)', 
+         "pt_08_s4_no2" = 'PT08.S4(NO2)', "pt_08_s5_o3" = 'PT08.S5(O3)') |>
+  filter(co_gt != -200) |>
+  mutate(across(where(is.numeric), list(mean = mean, sd = sd), 
+                .names = "{.col}_{.fn}")) |>
+  View()
+```
+
+### add in grouping functionality
+
+```{r}
+air_quality_data |>
+  select(-starts_with("...")) |>
+  rename("co_gt" = 'CO(GT)', "pt_08_s1_co" = 'PT08.S1(CO)', 
+         "nmhc_gt" = 'NMHC(GT)', "c6h6_gt" = 'C6H6(GT)', 
+         "pt_08_s2_nmhc" = 'PT08.S2(NMHC)', "nox_gt" = 'NOx(GT)', 
+         "pt_08_s3_nox" = 'PT08.S3(NOx)', "no2_gt" = 'NO2(GT)', 
+         "pt_08_s4_no2" = 'PT08.S4(NO2)', "pt_08_s5_o3" = 'PT08.S5(O3)') |>
+  filter(co_gt != -200) |>
+  group_by(Date) |>
+  mutate(across(where(is.numeric), list(mean = mean, sd = sd), 
+                .names = "{.col}_{.fn}")) |>
+  View()
+```
+
+# Manipulating data with tidyr
+
+```{r}
+#in wide form
+temps_data <- read_table(file = "https://www4.stat.ncsu.edu/~online/datasets/cityTemps.txt") 
+head(temps_data)
+```
+
+```{r}
+#convert to long form
+library(tidyr)
+temps_data |>
+  pivot_longer(cols = 2:8, 
+               names_to = "day", 
+               values_to = "temp")
+
+```
+
+## convert to wide form
+
+```{r}
+library(dplyr)
+library(Lahman)
+batting_tbl <- as_tibble(Batting)
+#subset data for just pirates, select hits and year columns, and pivot that data
+#set wider so that we have the year across the top (names_from), the players as
+#the rows, and the entries as the hits (values_from)
+batting_tbl |>
+  filter(yearID %in% 2018:2020, teamID == "PIT") |>
+  select(playerID, yearID, H) |>
+  pivot_wider(names_from = yearID, values_from = "H")
+```
+
+```{r}
+#not missing values, if we want to drop do this
+batting_tbl |>
+  filter(yearID %in% 2018:2020, teamID == "PIT") |>
+  select(playerID, yearID, H) |>
+  pivot_wider(names_from = yearID, values_from = "H") |>
+  drop_na()
+```
+
+```{r}
+#Let’s also remove those with 0 hits:
+batting_tbl |>
+  filter(yearID %in% 2018:2020, teamID == "PIT", H > 0) |>
+  select(playerID, yearID, H) |>
+  pivot_wider(names_from = yearID, values_from = "H") |>
+  drop_na()
+
+```
+
+## column manipulation with tidyr
+
+```{r}
+chicago_data <- read_csv("https://www4.stat.ncsu.edu/~online/datasets/Chicago.csv")
+chicago_data
+#change dates
+chicago_data |>
+  separate_wider_delim(cols = date, 
+                       delim = "/", 
+                       names = c("Month", "Day", "Year"), 
+                       cols_remove = FALSE)
+
+```
+
+## combine two columns for display purposes
+
+```{r}
+chicago_data |>
+  unite(col = "season_date", season, date, sep = ": ") |>
+  select(season_date, everything())
+```
+
+# Databases and basic SQL
+
+## connecting to databases
+
+```{r}
+library(DBI)
+#con <- dbConnect(data_base_type_goes_here_usually_requires_a_package, 
+#  host = "hostname.website",
+#  user = "username",
+#  password = rstudioapi::askForPassword("DB password")
+#)
+#This code tells R where the connection exists (host) and, if you need to login to gain access, the way #in which you could specify your username and password.
+```
+
+## databases
+
+• RSQLite::SQLite() for RSQLite • RMySQL::MySQL() for RMySQL • RPostgreSQL::PostgreSQL() for RPostgreSQL • odbc::odbc() for Open Database Connectivity • bigrquery::bigquery() for google’s bigQuery
+
+## querying a table
+
+use tbl() to reference a table in the database
+
+## disconnecting
+
+dbDisconnect(con)
+
+## Practice
+
+```{r}
+library(DBI)
+con <- dbConnect(RSQLite::SQLite(), "lahman.db")
+#view all tables in database
+dbListTables(con)
+#or
+DBI::dbListTables(con)
+
+```
+
+## access specific table
+
+```{r}
+tbl(con, "Pitching")
+```
+
+## get data into R (above doesn't, need to tell R)
+
+```{r}
+tbl(con, "Pitching") |>
+  select(ends_with("ID")) |>
+  filter(yearID == 2010) |>
+  collect()
+```
+
+```{r}
+#get out some SQL code from our dplyr code 
+tbl(con, "Pitching") |>
+  select(ends_with("ID")) |>
+  filter(yearID == 2010) |>
+  show_query()
+```
+
+```{r}
+#or write straight SQL code
+tbl(con, sql(
+"SELECT `playerID`, `yearID`, `teamID`, `lgID`
+FROM `Pitching`
+WHERE (`yearID` = 2010.0)")
+)
+#disconnect
+dbDisconnect(con)
+```
+
+# Reading from a database (video)
+
+Sample Query on website:
+
+-- This query shows a list of the daily top Google Search terms. SELECT refresh_date AS Day, term AS Top_Term, -- These search terms are in the top 25 in the US each day. rank, FROM `bigquery-public-data.google_trends.top_terms` WHERE rank = 1 -- Choose only the top term each day. AND refresh_date \>= DATE_SUB(CURRENT_DATE(), INTERVAL 2 WEEK) -- Filter to the last 2 weeks. GROUP BY Day, Top_Term, rank ORDER BY Day DESC -- Show the days in reverse chronological order.
+
+```{r}
+#need bigrquery package
+library(DBI)
+library(tidyverse)
+con <- dbConnect(
+  bigrquery::bigquery(),
+  project = "bigquery-public-data",
+  dataset = "google_trends",
+  billing = "st558-424916"
+)
+#NOTES, can see Google Trends Demo Query and select Open This Query to see 
+#data sets,google_trends is there,there is a sample query (SQL), can run it
+#within the web interface
+#Code below lists tables availablw within goggle_trends
+dbListTables(con)
+# choose something in google_trends, can click in browser and see variables, or
+#allternatiely to see variables use (names didn't work, update in R I guess)
+#tbl(con, "top_terms") |>
+#  names()
+tbl(con, "top_terms") |>
+  colnames()
+#get desired data, want dates greater than 5/14
+my_data <- tbl(con, "top_terms") |>
+  select(refresh_date, term, rank, dma_id, dma_name ) |>
+  rename("Day" = "refresh_date", "Top_Term" = "term") |>
+  filter(rank == 1, Day > lubridate::as_date("2024-05-14"), dma_id ==500) |>
+  collect()
+my_data
+```
+
+Look at my_data in environment to see what dma_id is. It is Portland_Auburn ME
+
+# SQL Style Joins
+
+## inner join
+
+batting and pitching have player ID, stint, lgID in common
+
+SEE CODE IN SQL JOINS NOTES
+
+```{r}
+dbDisconnect(con)
+```

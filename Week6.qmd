@@ -1,0 +1,341 @@
+---
+title: "Week 6"
+author: "Melanie Beebe"
+format: html
+editor: visual
+---
+
+# apply() family of functions
+
+## call in Lahman Battting data
+
+```{r}
+#code in lecture but doesn't work
+library(Lahman)
+library(tidyverse)
+my_batting <- 
+  Batting[, c("playerID", "teamID", "G", "AB", "R", "H", "X2B", "X3B", "HR")] |>
+  as_tibble()
+my_batting
+```
+
+```{r}
+library(Lahman)
+library(tidyverse)
+my_batting <- 
+  Batting |>
+  select (playerID, teamID, G, AB, R, H, X2B, X3B, HR) |>
+  as_tibble()
+my_batting
+```
+
+## use apply
+
+```{r}
+#NOTE the capital X
+apply(X = my_batting, 
+      MARGIN = 2, 
+      FUN = summary, 
+      na.rm = TRUE)
+```
+
+Above is not useful because we have multiple types of data, so R coerces all into character. Instead, use as.numeric to get a meaningful summary.
+
+```{r}
+batting_summary <- apply(X = my_batting |>
+                           select(where(is.numeric)), 
+                         MARGIN = 2, 
+                         FUN = summary, 
+                         na.rm = TRUE)
+batting_summary
+```
+
+## custom functions with the apply family (anonymous/lambda functions)
+
+```{r}
+custom_batting_summary <- apply(X = my_batting |>
+ select(where(is.numeric)),
+ MARGIN = 2,
+ FUN = function(x){
+ temp <- c(mean(x), sd(x))
+ names(temp) <- c("mean", "sd")
+ temp
+ }
+)
+custom_batting_summary
+```
+
+## other arguments can be provided in anonymous functions
+
+Here, trim = 0.1 is passed as an argument to the anonynmous function through apply
+
+```{r}
+custom_batting_summary <- apply(X = my_batting |>
+ select(where(is.numeric)),
+ MARGIN = 2,
+ FUN = function(x, trim){
+ temp <- c(mean(x, trim), sd(x))
+ names(temp) <- c("mean", "sd")
+return(temp)        #can use return or just say temp
+ },
+ trim = 0.1
+)
+custom_batting_summary
+```
+
+## lapply
+
+```{r}
+# generate list
+set.seed(10)
+my_list <- list(rnorm(100), runif(10), rgamma(40, shape = 1, rate = 1))
+my_list
+lapply(X = my_list, FUN = mean) #takes mean of each list
+```
+
+```{r}
+lapply(X = my_list, FUN = mean)
+```
+
+## can pass additional arguments
+
+```{r}
+lapply(X = my_list, FUN = mean, trim = 0.1, na.rm = TRUE)
+```
+
+## sapply (simplify the result)
+
+```{r}
+#simplifies list to vector
+sapply(X = my_list, FUN = mean)
+is.vector(sapply(X = my_list, FUN = mean))
+```
+
+# purrr, a cleaner version of apply
+
+## map() is an lapply() type function so it returns a list
+
+### use map to get means
+
+```{r}
+map(my_list, mean)  #equivalent to lapply(X = my_list, FUN = mean, trim = 0.1, na.rm = TRUE)
+```
+
+### other ways to use map
+
+```{r}
+#grap second element from each list element (see my_list printing)
+map(my_list, 2)
+#alt code using lapply
+lapply(my_list, function(x) x[[2]])
+#OR
+lapply(my_list, '[[' , 2)
+```
+
+Think of it like this: my_list \<- list( list(1, "a", TRUE), list(2, "b", FALSE), list(3, "c", TRUE) ) result \<- lapply(my_list, function(x) x\[\[2\]\])
+
+-   For the first list list(1, "a", TRUE), x\[\[2\]\] is "a".
+-   For the second list list(2, "b", FALSE), x\[\[2\]\] is "b".
+-   For the third list list(3, "c", TRUE), x\[\[2\]\] is "c".
+
+## purr allows us to use shorthand ways to make anonymous functions
+
+\\(x) = function(x), so \\(x0) mean(x) = function(x) mean(x)
+
+for example, result \<- map(my_list, \\(x) mean(x, trim = 0.1))
+
+# List columns
+
+used to add a list to a list, ie iris has 150 observations, can add a column of additional data of 150 observations
+
+```{r}
+iris |>
+ as_tibble() |>
+ mutate(diffs = pmap(list(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width),
+ \(x, y, z, w) list(x-y, x-z, x-w))) |>
+ select(diffs, everything())
+
+```
+
+view the diffs:
+
+```{r}
+iris |>
+ as_tibble() |>
+ mutate(diffs = pmap(list(Sepal.Length, Sepal.Width, Petal.Length, Petal.Width),
+ \(x, y, z, w) list(x-y, x-z, x-w))) |>
+pull(diffs)
+```
+
+# Advanced Function Writing
+
+## Unnamed arguments
+
+### Recall standardize function
+
+```{r}
+standardize <- function(vector, center = TRUE, scale = TRUE) {
+ mean <- mean(vector)
+ stdev <- sd(vector)
+ if (center) {
+ vector <- vector - mean
+ }
+ if (scale) {
+ vector <- vector / stdev
+ }
+ return(list(result = vector, mean = mean, sd = stdev))
+ }
+```
+
+-   sd() and mean() have as defaults na.rm = FALSE, so if there are NAs, the standardize function will return an error
+-   can use ... so na.rm can be changed however desired
+
+```{r}
+standardize <- function(vector, center = TRUE, scale = TRUE, ...) {
+ mean <- mean(vector, ...)
+ stdev <- sd(vector, ...)
+ if (center) {
+ vector <- vector - mean
+ }
+ if (scale) {
+ vector <- vector / stdev
+ }
+ return(list(result = vector, mean = mean, sd = stdev))
+}
+standard_Ozone <- standardize(airquality$Ozone, na.rm = TRUE)
+standard_Ozone$mean
+```
+
+## function to find group means
+
+### one group using enquo
+
+```{r}
+library(rlang)
+find_group_mean <- function(.df, group){ 
+  group_name <- enquo(group)
+  .df |> 
+    group_by(!!group_name) |> 
+    summarize(across(where(is.numeric), 
+                     list("mean" = mean), 
+                     .names = "{.fn}_{.col}"))
+}
+find_group_mean(iris, Species)
+```
+
+### one group using {{}}
+
+```{r}
+find_group_mean <- function(.df, group){ 
+  .df |> 
+    group_by({{group}}) |> 
+    summarize(across(where(is.numeric), 
+                     list("mean" = mean), 
+                     .names = "{.fn}_{.col}"))
+}
+find_group_mean(iris, Species)
+```
+
+### more than one group using quos
+
+```{r}
+find_group_mean <- function(.df, ...){ 
+  group_vars <- quos(...)
+  .df |> 
+    group_by(!!!group_vars) |> 
+    summarize(across(where(is.numeric), 
+                     list("mean" = mean), 
+                     .names = "{.fn}_{.col}"))
+}
+find_group_mean(CO2, Type, Treatment)
+```
+
+## as_label for tidyverse style functions
+
+```{r}
+find_group_mean <- function(.df, group, column){ 
+  group_name <- enquo(group)
+  column_name <- enquo(column)
+  column_label <- paste0("mean_", as_label(column_name))
+  .df |> 
+    group_by(!!group_name) |>
+    summarize(!!(column_label) := mean(!!column_name))
+}
+find_group_mean(iris, Species, Sepal.Length)
+```
+
+## Pipeable Functions
+
+Below need invisible(.df) because you can't pipe number of observations into summarize, the data is no longer accessible. invisible() returns data frame so you can keep using it.
+
+```{r}
+print_num_obs <- function(.df) {
+ cat("The number of observations in the data set is ", 
+     nrow(.df), 
+     "\n", 
+     sep = "") 
+  invisible(.df)
+}
+iris |>
+ print_num_obs() |>
+ summarize(mean = mean(Sepal.Length))
+```
+
+# Querying APIs
+
+API: Application Programming Interface, a communication protocol for 2 computers or 2 softwares communication
+
+```{r}
+library(tidycensus)
+rent <- "DP04_0142PE" #PE means percentage
+rent_data <- get_acs(variables = rent, 
+        geography = "county", 
+        geometry = TRUE, #returns the polygon data and allows for maps easily
+        survey = "acs5",
+        show_call = TRUE) #can add state and other things
+rent_data
+```
+
+## a plot
+
+```{r}
+#install mapview
+library(mapview)
+library(sf)
+library(webshot)
+map <- rent_data |> 
+  mapview::mapview(zcol = "estimate", 
+                   layer.name = "Median rent as a % of gross income")
+
+```
+
+## build our own API
+
+```{r}
+URL_ids <- "https://api.nhle.com/stats/rest/en/team"
+id_info <- httr::GET(URL_ids)
+str(id_info, max.level = 1)
+```
+
+## parse the data
+
+```{r}
+library(jsonlite)
+parsed <- fromJSON(rawToChar(id_info$content))
+parsed
+team_info <- as_tibble(parsed$data)
+team_info
+
+```
+
+## another example
+
+```{r}
+URL_team_stats <-
+"https://api.nhle.com/stats/rest/en/team/summary?sort=wins&cayenneExp=seasonId=20232024%20and%20gameTypeId=2"
+team_stats_return <- httr::GET(URL_team_stats)
+parsed_team_stats <- fromJSON(rawToChar(team_stats_return$content))
+team_stats <- as_tibble(parsed_team_stats$data)
+team_stats |>
+ select(teamId, teamFullName, everything())
+```

@@ -56,7 +56,7 @@ dim(my_iris)
 ## data frame
 
 ```{r}
-iris
+head(iris)
 str(iris)
 attributes(iris)
 iris[1:4, 2:4] 
@@ -125,10 +125,12 @@ Looking at trees data again
 is.list(trees)
 is.data.frame(trees)
 ```
+
 ```{r}
 trees[1]
 trees[[1]]      #simplified to a vector
 ```
+
 ## look at linear model fit
 
 ```{r}
@@ -149,5 +151,268 @@ fit$coefficients
 coef(fit)         #helper function
 fit$residuals
 residuals(fit)
+```
+
+## Control flow: logicals and if/then/else
+
+```{r}
+sqrt(3)^2 == 3
+dplyr::near(sqrt(3)^2, 3)
+```
+
+# if/then/else
+
+## fizz buzz challenge
+
+-   if it is divisible by 3 return fizz
+-   if it is divisible by 5 return buzz
+-   if it is divisible by 15 return fizz buzz
+
+```{r}
+number <- 15
+number %% 15   #answer is remainder, get zero because 15/15 has no remainder
+#so if zero, fizz buzz, so want this to be true, but 0 is false so need to find
+#a way to do this to get what we want
+21 %% 15   
+(number %% 15)
+#use negation (!) so return true
+!(number %% 15)
+
+if((number %% 15) == 0) { 
+  print("fizz buzz")
+} else if ((number %% 5) == 0) {
+  print ("buzz")
+} else if ((number %% 3) == 0) {
+  print ("fizz")
+} else {
+  print ("whoops")
+}
+#use negation (!) so if this is not zero return true
+#if(!(number %% 15)(number %% 3) -)
+number <- 5
+if((number %% 15) == 0) { 
+  print("fizz buzz")
+} else if ((number %% 5) == 0) {
+  print ("buzz")
+} else if ((number %% 3) == 0) {
+  print ("fizz")
+} else {
+  print ("whoops")
+}
+number <- 3
+if((number %% 15) == 0) { 
+  print("fizz buzz")
+} else if ((number %% 5) == 0) {
+  print ("buzz")
+} else if ((number %% 3) == 0) {
+  print ("fizz")
+} else {
+  print ("whoops")
+}
+number <- 2
+if((number %% 15) == 0) { 
+  print("fizz buzz")
+} else if ((number %% 5) == 0) {
+  print ("buzz")
+} else if ((number %% 3) == 0) {
+  print ("fizz")
+} else {
+  print ("whoops")
+}
+```
+
+
+## Control flow: loops
+
+```{r}
+for (i in c("cat","hat","worm")){
+  print(i)
+}
+
+```
+
+```{r}
+data <- runif(5)
+data
+```
+```{r}
+library(Lahman)
+my_batting <- Batting[, c("playerID", "teamID", "G", "AB", "R", "H", "X2B", "X3B", "HR")]
+head(my_batting)
+
+```
+
+```{r}
+dim(my_batting)
+for (i in 3:dim(my_batting)[2]){        #[2] tells R to get 2nd element of dim,9                    
+  print(summary(my_batting[ , i]))
+}
+#OR
+for (i in 3:9){                          
+  print(summary(my_batting[ , i]))
+}
+#OR
+#for (i in seq_along(my_batting)[-1:-2]){
+  print(summary(my_batting[ , i]))
+#}
+```
+
+```{r}
+words<-c("first", "second", "third", "fourth", "fifth")
+data <- runif(5)           #random uniform distribution
+for (i in 1:5){
+    if (i == 3) break         #i == 3 is “the third data point” so stops after “second”
+  print(paste0("The ", words[i], " data point is ", data[i], "."))
+}
+
+```
+
+```{r}
+#put fizz buzz in for loop
+for(number in -1:41){
+  if((number %% 15) == 0) { 
+  print("fizz buzz")
+} else if ((number %% 5) == 0) {
+  print ("buzz")
+} else if ((number %% 3) == 0) {
+  print ("fizz")
+} else {
+  print ("whoops")
+}
+}
+
+```
+
+
+## vectorized functions
+
+```{r}
+colMeans(my_batting[, 3:9])
+```
+
+```{r}
+library(matrixStats)
+#colMedians(my_batting[, 3:9])   DOESN'T work because needs to be a matrix
+```
+```{r}
+colMedians(as.matrix(my_batting[, 3:9]))
+```
+## ifelse
+
+```{r}
+head(airquality)
+#recall if/then/else
+airquality$Wind[1]      #first value (row) for wind
+if(airquality$Wind[1] >= 15) { 
+  "High Wind"
+} else if (airquality$Wind[1] >= 10){
+  "Windy"
+} else if (airquality$Wind[1] >= 6) {
+  "Light Wind"
+} else if (airquality$Wind[1] >= 0) {
+  "Calm"
+} else {
+  "Error"
+}
+#ANOTHER WAY
+#ifelse(vector_condition, if_true_do_this, if_false_do_this)
+#a vector is returned!
+
+ifelse(airquality$Wind >= 15, "HighWind",
+          ifelse(airquality$Wind >= 10, "Windy",
+                 ifelse(airquality$Wind >= 6, "LightWind", 
+                        ifelse(airquality$Wind >= 0, "Calm", "Error"))))
+
+```
+
+## Writing functions
+
+* you can generally type a function without () to get information about it
+
+```{r}
+var
+```
+## writing our own functions
+
+### normal approximation to the binomial
+
+```{r}
+# number of samples
+n <- 40
+#probablility of success
+prob <- 0.3
+#probabilities  from a binomial RV
+binom <- dbinom(0:n, size = n, prob = prob)
+binom
+#plot
+plot(0:n, binom)
+plot(0:n, binom, type = "h")
+```
+```{r}
+#plot normal curve since plot looks bell shaped
+#note: highlight all the below code to get plot to show instead of error
+plot(0:n, 
+     dbinom(0:n, size = n, prob = prob), type = "h")
+norm_x <- seq(from = 0, to = n, length = 1000)
+lines(norm_x, 
+      dnorm(norm_x, mean = n*prob, sd = sqrt(n*prob*(1-prob))))
+```
+
+### write a function to make this plot for any n and p
+
+```{r}
+plot_norm_approx <- function(n, prob){
+  #plot
+  plot(0:n, 
+     dbinom(0:n, size = n, prob = prob), type = "h")
+  norm_x <- seq(from = 0, to = n, length = 1000)
+  lines(norm_x, 
+      dnorm(norm_x, mean = n*prob, sd = sqrt(n*prob*(1-prob))))
+}
+
+```
+
+### test it out
+
+```{r}
+plot_norm_approx(30, 0.5)
+```
+```{r}
+# can test other values to see when a normal distribution is not a good approximation
+plot_norm_approx(30, 0.75)
+```
+```{r}
+plot_norm_approx(30, 0.95)
+```
+
+### make more user friendly by adding defaults
+
+```{r}
+plot_norm_approx <- function(n = 30, prob = 0.5){
+  #plot
+  plot(0:n, 
+     dbinom(0:n, size = n, prob = prob), type = "h")
+  norm_x <- seq(from = 0, to = n, length = 1000)
+  lines(norm_x, 
+      dnorm(norm_x, mean = n*prob, sd = sqrt(n*prob*(1-prob))))
+}
+```
+
+### test it
+
+```{r}
+#this will use set defaults
+plot_norm_approx()
+```
+
+```{r}
+#change sample size
+plot_norm_approx(50)
+```
+```{r}
+#change probability
+plot_norm_approx(prob = 0.10)
+# even if in wrong order, if one is defined, R knows what the other one is
+#plot_norm_approx(prob = 0.10, 50)
 ```
 
