@@ -1,0 +1,57 @@
+#
+# This is the server logic of a Shiny web application. You can run the
+# application by clicking 'Run App' above.
+#
+# Find out more about building applications with Shiny here:
+#
+#    https://shiny.posit.co/
+#
+
+library(shiny)
+
+# Define server logic required to draw a histogram
+function(input, output, session) {
+  
+  data <- reactive({
+    params <- c(input$alpha, input$gamma)
+    randomValues <- rgamma(input$bins, shape = params[1], rate = params[2])
+    list(ran = randomValues, alpha = params[1], gamma = params[2])
+  })
+  
+  observeEvent(input$submit, {
+    print(input$alpha)
+  })
+  
+  data2 <- eventReactive(input$submit, {
+    input$bins
+  })
+  
+  output$slider <- renderUI({
+    sliderInput("bins", "Number of bins", min = 1, max = input$maxBins, 
+                value = 30)
+  })
+  
+  output$distPlot <- renderPlot({
+    # generate bins based on input$bins from ui.R
+    x <- faithful[, 2]
+    bins <- seq(min(x), max(x), length.out = data2() + 1)
+    
+    # draw the histogram with the specified number of bins
+    hist(x, breaks = bins, col = 'darkgray', border = 'white',
+         xlab = 'Waiting time to next eruption (in mins)',
+         main = 'Histogram of waiting times')
+  })
+  
+  output$mytext <- renderUI ({
+    info <- data()
+    paste0("The value of the slider is ", input$bins, 
+           ". The alpha parameter is ", 
+           info$alpha, ". The gamma parameter is ", info$gamma, 
+           ". The first data value is ", info$ran[1])
+  })
+  
+  output$myTable <- renderTable({
+    info <- data()
+    data.frame(gamma = info$ran)
+  })
+}
